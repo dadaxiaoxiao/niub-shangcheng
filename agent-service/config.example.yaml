@@ -1,0 +1,11 @@
+llm:
+  base_url: https://api.openai.com/v1
+  api_key: sk-replace-with-your-key
+  model: replace-with-your-model
+  system_prompt: |
+    你是牛脖商城的购物助手。
+    请用简洁、自然的中文回答，优先给出具体而可执行的建议。
+  temperature: 0.7
+  max_tokens: 1024
+  timeout_seconds: 60
+
