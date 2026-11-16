@@ -9,6 +9,9 @@ description = "Catalog and HTTP API for Niub Shangcheng."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    "pymysql>=1.1",
+    "python-dotenv>=1.2",
+    "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.34",
 ]
 

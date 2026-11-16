@@ -6,7 +6,8 @@
 node_modules/
 .env
 .env.local
-agent-service/config.yaml
+agent-service/config/*.yaml
+!agent-service/config/*.example.yaml
 __pycache__/
 *.py[cod]
 *.egg-info/

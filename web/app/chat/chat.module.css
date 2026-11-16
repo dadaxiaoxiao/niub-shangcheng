@@ -12,7 +12,6 @@
   padding: 38px 34px 32px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   overflow: hidden;
   color: #f6f1e7;
   background:
@@ -55,10 +54,24 @@
   font-size: 17px;
 }
 
+.sidebarTop {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarHeading {
+  display: flex;
+  flex-direction: column;
+}
+
 .brand {
   position: relative;
   z-index: 1;
-  margin-top: 58px;
+  margin-top: 32px;
   display: flex;
   align-items: center;
   gap: 13px;
@@ -93,35 +106,144 @@
   letter-spacing: 0.16em;
 }
 
-.intro {
+.history {
   position: relative;
   z-index: 1;
-  max-width: 265px;
-  margin-top: 116px;
+  margin-top: 34px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.eyebrow {
-  color: #d78d62;
-  font-family: "Courier New", monospace;
+.historyHeading {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: rgba(246, 241, 231, 0.4);
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
 }
 
-.intro h1 {
-  margin: 18px 0 22px;
-  font-size: clamp(37px, 3.4vw, 50px);
-  font-weight: 500;
-  letter-spacing: -0.06em;
-  line-height: 1.16;
+.historyHeading span:last-child {
+  font-family: "Courier New", monospace;
+  font-size: 9px;
 }
 
-.intro p {
+.historyNotice {
+  margin: 4px 4px 10px;
+  color: rgba(246, 241, 231, 0.38);
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.historyNotice code {
+  margin: 5px 0 3px;
+  padding: 4px 7px;
+  display: block;
+  color: rgba(246, 241, 231, 0.72);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  font-family: "Courier New", monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.historyList {
   margin: 0;
-  color: rgba(246, 241, 231, 0.48);
+  padding: 0;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-color: rgba(246, 241, 231, 0.18) transparent;
+  scrollbar-width: thin;
+}
+
+.historyItem {
+  display: flex;
+  align-items: stretch;
+  border-radius: 4px;
+  transition: background 160ms ease;
+}
+
+.historyItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.historyItemActive {
+  background: rgba(230, 199, 166, 0.12);
+  box-shadow: inset 2px 0 0 #e6c7a6;
+}
+
+.historyLink {
+  min-width: 0;
+  padding: 9px 10px;
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.historyTitle {
+  overflow: hidden;
+  color: rgba(246, 241, 231, 0.82);
   font-family: "Noto Sans SC", "PingFang SC", sans-serif;
   font-size: 12px;
-  line-height: 1.9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyItemActive .historyTitle {
+  color: #f6f1e7;
+}
+
+.historyMeta {
+  display: flex;
+  gap: 8px;
+  color: rgba(246, 241, 231, 0.36);
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  font-size: 9px;
+}
+
+.historyPreview {
+  overflow: hidden;
+  color: rgba(246, 241, 231, 0.34);
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyDelete {
+  flex: 0 0 26px;
+  width: 26px;
+  padding: 0;
+  color: rgba(246, 241, 231, 0.32);
+  background: transparent;
+  border: 0;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.historyItem:hover .historyDelete,
+.historyDelete:focus-visible {
+  opacity: 1;
+}
+
+.historyDelete:hover {
+  color: #e28a68;
 }
 
 .sidebarFooter {
@@ -591,33 +713,80 @@
 
 @media (max-width: 860px) {
   .workspace {
+    height: 100vh;
+    min-height: 0;
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
     min-height: auto;
-    padding: 18px 22px;
-    flex-direction: row;
-    align-items: center;
+    padding: 14px 20px 12px;
   }
 
-  .sidebar > div:first-child {
-    display: flex;
+  .sidebarTop {
+    flex: 0 0 auto;
+  }
+
+  .sidebarHeading {
+    flex-direction: row;
     align-items: center;
-    gap: 20px;
+    gap: 18px;
   }
 
   .brand {
     margin-top: 0;
   }
 
-  .intro,
+  .history {
+    margin-top: 12px;
+    flex: 0 0 auto;
+  }
+
+  .historyHeading {
+    display: none;
+  }
+
+  .historyList {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 8px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .historyList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .historyItem {
+    flex: 0 0 auto;
+    width: 196px;
+    border: 1px solid rgba(246, 241, 231, 0.09);
+  }
+
+  .historyLink {
+    padding: 7px 9px;
+  }
+
+  .historyPreview {
+    display: none;
+  }
+
+  .historyDelete {
+    flex-basis: 24px;
+    width: 24px;
+  }
+
   .sidebarFooter {
     display: none;
   }
 
   .conversation {
-    height: calc(100vh - 76px);
+    height: auto;
+    min-height: 0;
   }
 
   .thread {
@@ -642,8 +811,8 @@
     display: none;
   }
 
-  .conversation {
-    height: calc(100vh - 69px);
+  .historyItem {
+    width: 168px;
   }
 
   .header {
@@ -682,6 +851,12 @@
 
   .composer {
     padding-left: 14px;
+  }
+}
+
+@media (hover: none) {
+  .historyDelete {
+    opacity: 1;
   }
 }
 

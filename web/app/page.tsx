@@ -47,7 +47,7 @@ export default async function Home() {
       <nav className="site-nav" aria-label="主导航">
         <a className="wordmark" href="#top" aria-label="返回首页">
           <span className="wordmark-mark">牛</span>
-          <span>牛脖商城</span>
+          <span>牛逼商城</span>
         </a>
         <div className="nav-links">
           <a href="#products">本期好物</a>
@@ -157,7 +157,7 @@ export default async function Home() {
       </section>
 
       <footer>
-        <span>牛脖商城 · 慢慢挑，认真用</span>
+        <span>牛逼商城 · 慢慢挑，认真用</span>
         <span>Agent Service / Mall / Next.js</span>
       </footer>
     </main>

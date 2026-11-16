@@ -15,7 +15,7 @@ type ChatResponse = {
 };
 
 const WELCOME =
-  "你好，我是牛脖商城的购物助手。告诉我预算或使用场景，我来帮你一起挑。";
+  "你好，我是牛逼商城的购物助手。告诉我预算或使用场景，我来帮你一起挑。";
 
 export default function AgentChat() {
   const [messages, setMessages] = useState<Message[]>([
@@ -111,6 +111,10 @@ export default function AgentChat() {
           {isLoading ? "思考中" : "发送"}
         </button>
       </form>
+
+      <a className="chat-panel-link" href="/chat">
+        在完整页面继续多轮对话 <span aria-hidden="true">↗</span>
+      </a>
     </div>
   );
 }

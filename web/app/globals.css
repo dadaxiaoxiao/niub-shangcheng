@@ -448,9 +448,29 @@ textarea {
   border: 1px solid var(--line);
 }
 
+.service-page {
+  min-height: 100vh;
+  padding: 80px 24px;
+  display: grid;
+  place-items: center;
+}
+
+.service-page .service-notice {
+  width: min(560px, 100%);
+}
+
 .service-notice p {
   margin: 10px 0 0;
   color: var(--muted);
+}
+
+.service-notice code {
+  padding: 2px 6px;
+  color: var(--ink);
+  background: rgba(34, 35, 31, 0.06);
+  border-radius: 3px;
+  font-family: "Courier New", monospace;
+  font-size: 0.92em;
 }
 
 .assistant-section {
@@ -597,6 +617,21 @@ textarea {
 .chat-form button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.chat-panel-link {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(251, 248, 241, 0.55);
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  font-size: 11px;
+  transition: color 160ms ease;
+}
+
+.chat-panel-link:hover {
+  color: #e9ceb2;
 }
 
 footer {

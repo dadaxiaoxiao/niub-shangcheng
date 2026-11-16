@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FormEvent,
   KeyboardEvent,
@@ -8,6 +10,11 @@ import {
   useState,
 } from "react";
 
+import type {
+  ConversationDetail,
+  ConversationSummary,
+  HistoryState,
+} from "@/lib/mall";
 import styles from "@/app/chat/chat.module.css";
 
 
@@ -21,7 +28,7 @@ type ChatMessage = {
 };
 
 type StreamEvent = {
-  type: "start" | "status" | "delta" | "done" | "error";
+  type: "start" | "status" | "delta" | "done" | "error" | "conversation";
   messageId?: string;
   delta?: string;
   statusText?: string;
@@ -29,10 +36,17 @@ type StreamEvent = {
   elapsedMs?: number;
   sequence?: number;
   message?: string;
+  conversationId?: string;
+};
+
+type ChatWorkspaceProps = {
+  conversations: ConversationSummary[];
+  initialConversation?: ConversationDetail;
+  historyState: HistoryState;
 };
 
 const WELCOME =
-  "你好，我是牛脖商城的购物助手。你可以告诉我预算、使用场景或想送的人，我们慢慢把选择范围缩小。";
+  "你好，我是牛逼商城的购物助手。你可以告诉我预算、使用场景或想送的人，我们慢慢把选择范围缩小。";
 
 const SUGGESTIONS = [
   "300 元以内，适合送朋友什么？",
@@ -56,6 +70,54 @@ function formatClock(timestamp?: string): string {
   }).format(new Date(timestamp));
 }
 
+function formatMessageTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return new Intl.DateTimeFormat(
+    "zh-CN",
+    sameDay
+      ? { hour: "2-digit", minute: "2-digit", hour12: false }
+      : {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        },
+  ).format(date);
+}
+
+function formatRelative(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diff = Date.now() - date.getTime();
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diff < minute) {
+    return "刚刚";
+  }
+  if (diff < hour) {
+    return `${Math.floor(diff / minute)} 分钟前`;
+  }
+  if (diff < day) {
+    return `${Math.floor(diff / hour)} 小时前`;
+  }
+  if (diff < 7 * day) {
+    return `${Math.floor(diff / day)} 天前`;
+  }
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function readSseBlock(block: string): StreamEvent | null {
   const data = block
     .split("\n")
@@ -74,14 +136,37 @@ function readSseBlock(block: string): StreamEvent | null {
   }
 }
 
-export default function ChatWorkspace() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: "welcome", role: "assistant", content: WELCOME },
-  ]);
+function buildInitialMessages(
+  conversation?: ConversationDetail,
+): ChatMessage[] {
+  if (!conversation || conversation.messages.length === 0) {
+    return [{ id: "welcome", role: "assistant", content: WELCOME }];
+  }
+  return conversation.messages.map((message) => ({
+    id: `message-${message.id}`,
+    role: message.role,
+    content: message.content,
+    meta: formatMessageTime(message.created_at),
+  }));
+}
+
+export default function ChatWorkspace({
+  conversations,
+  initialConversation,
+  historyState,
+}: ChatWorkspaceProps) {
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    buildInitialMessages(initialConversation),
+  );
+  const [conversationId, setConversationId] = useState<string | null>(
+    initialConversation?.id ?? null,
+  );
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -120,22 +205,13 @@ export default function ChatWorkspace() {
       role: "assistant",
       content: "",
     };
-    const requestMessages = [...messages, userMessage].map(
-      ({ role, content: messageContent }) => ({
-        role,
-        content: messageContent,
-      }),
-    );
 
-    setMessages((current) => [
-      ...current,
-      userMessage,
-      assistantMessage,
-    ]);
+    setMessages((current) => [...current, userMessage, assistantMessage]);
     setInput("");
     setIsStreaming(true);
     setStreamingId(assistantId);
     setStreamStatus("正在连接 SSE 服务");
+    setHistoryError(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -144,7 +220,7 @@ export default function ChatWorkspace() {
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: requestMessages }),
+        body: JSON.stringify({ conversationId, message: content }),
         signal: controller.signal,
       });
 
@@ -177,6 +253,17 @@ export default function ChatWorkspace() {
             eventCount += 1;
             firstEventTimestamp ??= streamEvent.timestamp;
             lastEventTimestamp = streamEvent.timestamp ?? lastEventTimestamp;
+          }
+          if (
+            streamEvent?.type === "conversation" &&
+            streamEvent.conversationId
+          ) {
+            setConversationId(streamEvent.conversationId);
+            window.history.replaceState(
+              null,
+              "",
+              `/chat/${streamEvent.conversationId}`,
+            );
           }
           if (streamEvent?.type === "status" && streamEvent.statusText) {
             setStreamStatus(streamEvent.statusText);
@@ -247,6 +334,7 @@ export default function ChatWorkspace() {
       setStreamingId(null);
       setStreamStatus(null);
       textareaRef.current?.focus();
+      router.refresh();
     }
   }
 
@@ -272,12 +360,44 @@ export default function ChatWorkspace() {
     abortRef.current?.abort();
   }
 
-  function newConversation() {
+  function startNewConversation() {
     abortRef.current?.abort();
+    setConversationId(null);
     setMessages([{ id: "welcome", role: "assistant", content: WELCOME }]);
     setInput("");
     setStreamStatus(null);
+    setHistoryError(null);
+    router.push("/chat");
     textareaRef.current?.focus();
+  }
+
+  async function removeConversation(id: string) {
+    if (!window.confirm("删除这个会话？对话内容将无法恢复。")) {
+      return;
+    }
+
+    setHistoryError(null);
+    try {
+      const response = await fetch(
+        `/api/conversations/${encodeURIComponent(id)}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok && response.status !== 404) {
+        throw new Error("删除失败，请稍后再试。");
+      }
+
+      if (id === conversationId) {
+        abortRef.current?.abort();
+        setConversationId(null);
+        setMessages([{ id: "welcome", role: "assistant", content: WELCOME }]);
+        setInput("");
+        router.push("/chat");
+      } else {
+        router.refresh();
+      }
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : "删除失败。");
+    }
   }
 
   function useSuggestion(suggestion: string) {
@@ -285,38 +405,96 @@ export default function ChatWorkspace() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
+  const showEmptyState = !conversationId && messages.length === 1;
+
   return (
     <div className={styles.workspace}>
       <aside className={styles.sidebar}>
-        <div>
-          <a className={styles.backLink} href="/">
-            <span aria-hidden="true">←</span>
-            返回商城
-          </a>
+        <div className={styles.sidebarTop}>
+          <div className={styles.sidebarHeading}>
+            <a className={styles.backLink} href="/">
+              <span aria-hidden="true">←</span>
+              返回商城
+            </a>
 
-          <div className={styles.brand}>
-            <span className={styles.brandMark}>牛</span>
-            <div>
-              <strong>牛脖商城</strong>
-              <span>SHOPPING ASSISTANT</span>
+            <div className={styles.brand}>
+              <span className={styles.brandMark}>牛</span>
+              <div>
+                <strong>牛逼商城</strong>
+                <span>SHOPPING ASSISTANT</span>
+              </div>
             </div>
           </div>
 
-          <div className={styles.intro}>
-            <span className={styles.eyebrow}>A LITTLE HELP</span>
-            <h1>一起挑件<br />真正合适的东西。</h1>
-            <p>
-              对话会保留在当前页面中，并由 Agent 服务实时调用模型。
-              回复会随着模型生成逐段出现。
-            </p>
-          </div>
+          <section className={styles.history} aria-label="历史会话">
+            <div className={styles.historyHeading}>
+              <span>历史会话</span>
+              <span>{conversations.length}</span>
+            </div>
+
+            {historyState === "database_unavailable" && (
+              <p className={styles.historyNotice}>
+                数据库尚未初始化。请在 mall 目录执行：
+                <code>uv run python -m mall.init_db</code>
+                然后刷新页面。
+              </p>
+            )}
+            {historyState === "unavailable" && (
+              <p className={styles.historyNotice}>历史记录暂时不可用。</p>
+            )}
+            {historyState === "ok" && conversations.length === 0 && (
+              <p className={styles.historyNotice}>还没有保存的对话。</p>
+            )}
+
+            <ul className={styles.historyList}>
+              {conversations.map((conversation) => (
+                <li
+                  key={conversation.id}
+                  className={`${styles.historyItem} ${
+                    conversation.id === conversationId
+                      ? styles.historyItemActive
+                      : ""
+                  }`}
+                >
+                  <Link
+                    className={styles.historyLink}
+                    href={`/chat/${conversation.id}`}
+                    onClick={() => abortRef.current?.abort()}
+                  >
+                    <span className={styles.historyTitle}>
+                      {conversation.title || "新对话"}
+                    </span>
+                    <span className={styles.historyMeta}>
+                      <span>{formatRelative(conversation.updated_at)}</span>
+                      <span>{conversation.message_count} 条</span>
+                    </span>
+                    <span className={styles.historyPreview}>
+                      {conversation.preview || "暂无消息"}
+                    </span>
+                  </Link>
+                  <button
+                    className={styles.historyDelete}
+                    type="button"
+                    aria-label={`删除会话：${conversation.title || "新对话"}`}
+                    onClick={() => void removeConversation(conversation.id)}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {historyError && (
+              <p className={styles.historyNotice}>{historyError}</p>
+            )}
+          </section>
         </div>
 
         <div className={styles.sidebarFooter}>
           <span className={styles.pulseDot} />
           <div>
             <strong>真实模型 SSE</strong>
-            <span>YAML 配置 · 流式响应</span>
+            <span>流式响应 · MySQL 历史</span>
           </div>
         </div>
       </aside>
@@ -336,17 +514,19 @@ export default function ChatWorkspace() {
           <button
             className={styles.newChatButton}
             type="button"
-            onClick={newConversation}
+            onClick={startNewConversation}
           >
             ＋ 新对话
           </button>
         </header>
 
         <div className={styles.thread} role="log" aria-live="polite">
-          <div className={styles.threadIntro}>
-            <span>今天想找点什么？</span>
-            <p>可以直接描述预算、对象或使用场景。</p>
-          </div>
+          {showEmptyState && (
+            <div className={styles.threadIntro}>
+              <span>今天想找点什么？</span>
+              <p>可以直接描述预算、对象或使用场景。</p>
+            </div>
+          )}
 
           {messages.map((message) => (
             <article
@@ -382,7 +562,7 @@ export default function ChatWorkspace() {
             </article>
           ))}
 
-          {messages.length === 1 && (
+          {showEmptyState && (
             <div className={styles.suggestions}>
               {SUGGESTIONS.map((suggestion, index) => (
                 <button

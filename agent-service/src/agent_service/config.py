@@ -12,12 +12,6 @@ from pydantic import (
 )
 
 
-DEFAULT_SYSTEM_PROMPT = (
-    "你是牛脖商城的购物助手。"
-    "请用简洁、自然的中文回答，优先给出具体而可执行的建议。"
-)
-
-
 class LlmConfig(BaseModel):
     base_url: str = Field(
         default="https://api.openai.com/v1",
@@ -29,15 +23,22 @@ class LlmConfig(BaseModel):
         validation_alias=AliasChoices("api_key", "apiKey", "apikey"),
     )
     model: str = Field(min_length=1)
-    system_prompt: str = Field(
-        default=DEFAULT_SYSTEM_PROMPT,
-        validation_alias=AliasChoices("system_prompt", "systemPrompt"),
+    prompt_file: str = Field(
+        default="prompts/shopping_agent.md",
+        min_length=1,
+        validation_alias=AliasChoices("prompt_file", "promptFile"),
     )
     temperature: float | None = Field(default=None, ge=0, le=2)
     max_tokens: int | None = Field(
         default=None,
         ge=1,
         validation_alias=AliasChoices("max_tokens", "maxTokens"),
+    )
+    max_turns: int = Field(
+        default=6,
+        ge=1,
+        le=20,
+        validation_alias=AliasChoices("max_turns", "maxTurns"),
     )
     timeout_seconds: float = Field(
         default=60,
@@ -53,8 +54,29 @@ class LlmConfig(BaseModel):
         return value
 
 
+class MallConfig(BaseModel):
+    base_url: str = Field(
+        default="http://127.0.0.1:3001",
+        min_length=1,
+        validation_alias=AliasChoices("base_url", "baseUrl", "baseURL"),
+    )
+    timeout_seconds: float = Field(
+        default=5,
+        gt=0,
+        validation_alias=AliasChoices("timeout_seconds", "timeoutSeconds"),
+    )
+
+    @field_validator("base_url", mode="before")
+    @classmethod
+    def expand_environment_variables(cls, value: object) -> object:
+        if isinstance(value, str):
+            return os.path.expandvars(value)
+        return value
+
+
 class AppConfig(BaseModel):
     llm: LlmConfig
+    mall: MallConfig = Field(default_factory=MallConfig)
 
 
 class ConfigError(RuntimeError):
@@ -76,7 +98,7 @@ class ConfigStore:
             if not path.is_absolute():
                 path = Path.cwd() / path
         else:
-            path = Path(__file__).resolve().parents[2] / "config.yaml"
+            path = Path(__file__).resolve().parents[2] / "config" / "llm.yaml"
         return path.resolve()
 
     def get(self) -> AppConfig:
@@ -85,7 +107,7 @@ class ConfigStore:
             modified_ns = path.stat().st_mtime_ns
         except FileNotFoundError as exc:
             raise ConfigError(
-                "模型配置文件不存在，请创建 config.yaml 或设置 AGENT_CONFIG_FILE。"
+                "模型配置文件不存在，请创建 config/llm.yaml 或设置 AGENT_CONFIG_FILE。"
             ) from exc
 
         if (
@@ -104,6 +126,15 @@ class ConfigStore:
 
         if not isinstance(raw_config, dict):
             raise ConfigError("模型配置文件必须是一个 YAML 对象。")
+
+        llm_section = raw_config.get("llm")
+        if isinstance(llm_section, dict) and (
+            "system_prompt" in llm_section or "systemPrompt" in llm_section
+        ):
+            raise ConfigError(
+                "llm.system_prompt 已废弃：请把提示词移到 prompts/shopping_agent.md，"
+                "并在配置中设置 llm.prompt_file。"
+            )
 
         try:
             config = AppConfig.model_validate(raw_config)
