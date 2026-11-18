@@ -11,6 +11,8 @@
 依赖方向是 `web -> agent-service` 和 `web -> mall`；`agent-service` 还会通过
 HTTP 只读调用 `mall` 的商品目录（当前为 mock 数据）。
 
+> 本机快速启动、实际端口（mall 为 3011）与排障速查见 [reader.md](reader.md)。
+
 ## 从零开始：完整运行教程
 
 下面按顺序完成，即可得到一个可逛商品、可多轮对话、可回看历史的本机环境。
