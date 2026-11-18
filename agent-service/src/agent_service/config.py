@@ -65,6 +65,12 @@ class MallConfig(BaseModel):
         gt=0,
         validation_alias=AliasChoices("timeout_seconds", "timeoutSeconds"),
     )
+    demo_user_id: str = Field(
+        default="u-demo",
+        min_length=1,
+        max_length=64,
+        validation_alias=AliasChoices("demo_user_id", "demoUserId"),
+    )
 
     @field_validator("base_url", mode="before")
     @classmethod

@@ -11,4 +11,5 @@ llm:
 mall:
   base_url: http://127.0.0.1:3001
   timeout_seconds: 5
+  demo_user_id: u-demo
 

@@ -5,7 +5,9 @@ from pydantic import ValidationError
 
 from agent_service.mall_client import Product
 from agent_service.tools import (
+    TOOL_DEFINITIONS,
     GetProductArgs,
+    RecommendProductsArgs,
     SearchProductsArgs,
     ToolRunner,
     filter_products,
@@ -181,10 +183,46 @@ class ArgumentValidationTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             GetProductArgs(product_id="")
 
+    def test_recommend_args_strip_and_dedupe(self):
+        args = RecommendProductsArgs(
+            focus="  送朋友  ",
+            category=" 茶饮 ",
+            exclude_product_ids=["a", " a ", "b"],
+        )
+        self.assertEqual(args.focus, "送朋友")
+        self.assertEqual(args.category, "茶饮")
+        self.assertEqual(args.exclude_product_ids, ["a", "b"])
+
+    def test_recommend_args_reject_negative_price_and_too_many_ids(self):
+        with self.assertRaises(ValidationError):
+            RecommendProductsArgs(max_price_cents=-1)
+        with self.assertRaises(ValidationError):
+            RecommendProductsArgs(
+                exclude_product_ids=[f"p{index}" for index in range(21)]
+            )
+
 
 class FakeMall:
     async def list_products(self):
         return PRODUCTS
+
+    async def get_profile(self, user_id):
+        return None
+
+    async def get_browsing_history(self, user_id, limit=20):
+        return []
+
+    async def get_orders(self, user_id, limit=10):
+        return []
+
+    async def get_cart(self, user_id):
+        return None
+
+    async def get_recommendations(self, user_id, **kwargs):
+        return []
+
+    async def get_ad_candidates(self, user_id, **kwargs):
+        return []
 
 
 class ToolRunnerTest(unittest.TestCase):
@@ -228,6 +266,31 @@ class ToolRunnerTest(unittest.TestCase):
     def test_invalid_arguments_return_error(self):
         result = asyncio.run(
             self.runner.execute("search_products", {"limit": 0})
+        )
+        self.assertIn("error", result)
+
+    def test_recommend_tool_is_registered(self):
+        names = [
+            definition["function"]["name"]
+            for definition in TOOL_DEFINITIONS
+        ]
+        self.assertIn("recommend_products", names)
+
+    def test_recommend_returns_cold_start_payload(self):
+        result = asyncio.run(
+            self.runner.execute("recommend_products", {"focus": "送朋友"})
+        )
+        self.assertEqual(result["target_count"], 3)
+        self.assertTrue(result["profile"]["cold_start"])
+        self.assertEqual(result["candidates"], [])
+        self.assertTrue(result["hint"])
+
+    def test_recommend_invalid_arguments_return_error(self):
+        result = asyncio.run(
+            self.runner.execute(
+                "recommend_products",
+                {"max_price_cents": -1},
+            )
         )
         self.assertIn("error", result)
 

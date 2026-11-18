@@ -13,6 +13,21 @@ class AppConfigTest(unittest.TestCase):
         )
         self.assertEqual(config.llm.prompt_file, "prompts/shopping_agent.md")
 
+    def test_demo_user_id_default(self):
+        config = AppConfig.model_validate(
+            {"llm": {"api_key": "test", "model": "test-model"}}
+        )
+        self.assertEqual(config.mall.demo_user_id, "u-demo")
+
+    def test_demo_user_id_can_be_overridden(self):
+        config = AppConfig.model_validate(
+            {
+                "llm": {"api_key": "test", "model": "test-model"},
+                "mall": {"demo_user_id": "u-other"},
+            }
+        )
+        self.assertEqual(config.mall.demo_user_id, "u-other")
+
     def test_legacy_system_prompt_is_rejected(self):
         with tempfile.TemporaryDirectory() as tempdir:
             path = Path(tempdir) / "llm.yaml"

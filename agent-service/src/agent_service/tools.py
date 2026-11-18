@@ -3,11 +3,13 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from agent_service.mall_client import MallClient, MallError, Product
+from agent_service.recommendation import RecommendArgs, RecommendationPipeline
 
 
 TOOL_LABELS = {
     "search_products": "正在检索商品目录",
     "get_product": "正在查看商品详情",
+    "recommend_products": "正在结合你的偏好与浏览记录挑选商品",
 }
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
@@ -73,6 +75,50 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "recommend_products",
+            "description": (
+                "基于当前用户的画像、浏览/搜索记录、历史订单和购物车，"
+                "先向商品推荐系统获取候选，再向广告系统获取最多 1 个推广候选，"
+                "并完成库存、价格、负反馈和购物车校验。"
+                "用户请求个性化推荐、送礼建议或不知道买什么时，必须先调用此工具。"
+                "工具返回候选池和用户信号，由你综合判断后选出 3 个商品。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "focus": {
+                        "type": "string",
+                        "description": (
+                            "用户本轮关注点或场景的简短摘要，"
+                            "例如 送朋友生日礼物、办公室自用。"
+                        ),
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": (
+                            "用户明确要求的品类，"
+                            "例如 茶饮、器物、日常、香氛、礼盒。"
+                        ),
+                    },
+                    "max_price_cents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "用户明确给出的最高价格，单位分。例如 300 元传 30000。",
+                    },
+                    "exclude_product_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "maxItems": 20,
+                        "description": "本次对话中已经推荐过、需要排除的商品 ID。",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 
@@ -91,6 +137,30 @@ class SearchProductsArgs(BaseModel):
 
 class GetProductArgs(BaseModel):
     product_id: str = Field(min_length=1, max_length=64)
+
+
+class RecommendProductsArgs(BaseModel):
+    focus: str = Field(default="", max_length=200)
+    category: str = Field(default="", max_length=40)
+    max_price_cents: int | None = Field(default=None, ge=0)
+    exclude_product_ids: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+    )
+
+    @field_validator("focus", "category")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("exclude_product_ids")
+    @classmethod
+    def clean_product_ids(cls, value: list[str]) -> list[str]:
+        return list(
+            dict.fromkeys(
+                item.strip() for item in value if item.strip()
+            )
+        )
 
 
 def product_payload(
@@ -151,8 +221,9 @@ def filter_products(
 class ToolRunner:
     """Executes model-requested tools against the mall catalog."""
 
-    def __init__(self, mall: MallClient) -> None:
+    def __init__(self, mall: MallClient, user_id: str = "u-demo") -> None:
         self._mall = mall
+        self._pipeline = RecommendationPipeline(mall, user_id)
 
     @property
     def definitions(self) -> list[dict[str, Any]]:
@@ -167,7 +238,27 @@ class ToolRunner:
             return await self._search(arguments)
         if name == "get_product":
             return await self._get_product(arguments)
+        if name == "recommend_products":
+            return await self._recommend(arguments)
         return {"error": f"未知工具：{name}"}
+
+    async def _recommend(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        try:
+            args = RecommendProductsArgs.model_validate(arguments)
+        except ValidationError:
+            return {"error": "推荐参数不合法，请调整约束后重试。"}
+
+        try:
+            return await self._pipeline.run(
+                RecommendArgs(
+                    focus=args.focus,
+                    category=args.category,
+                    max_price_cents=args.max_price_cents,
+                    exclude_product_ids=args.exclude_product_ids,
+                )
+            )
+        except MallError as exc:
+            return {"error": str(exc)}
 
     async def _search(self, arguments: dict[str, Any]) -> dict[str, Any]:
         try:

@@ -124,6 +124,7 @@ async def health() -> dict[str, object]:
         "config_status": "ready",
         "model": config.llm.model,
         "mall": config.mall.base_url,
+        "demo_user_id": config.mall.demo_user_id,
         "prompt": prompt_status,
     }
 
@@ -133,7 +134,10 @@ async def chat(request: ChatRequest) -> ChatResponse:
     config = load_config()
     instructions = load_instructions(config)
     messages = [{"role": "user", "content": request.message}]
-    tool_runner = ToolRunner(MallClient(config.mall))
+    tool_runner = ToolRunner(
+        MallClient(config.mall),
+        user_id=config.mall.demo_user_id,
+    )
 
     try:
         reply = await complete_chat(
@@ -170,7 +174,10 @@ async def chat_stream(
         {"role": message.role, "content": message.content}
         for message in payload.messages
     ]
-    tool_runner = ToolRunner(MallClient(config.mall))
+    tool_runner = ToolRunner(
+        MallClient(config.mall),
+        user_id=config.mall.demo_user_id,
+    )
     session_id = str(uuid.uuid4())
     message_id = str(uuid.uuid4())
 
