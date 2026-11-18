@@ -3,6 +3,7 @@
 .uv-cache/
 .next/
 .runlogs/
+.zcode/
 node_modules/
 .env
 .env.local
