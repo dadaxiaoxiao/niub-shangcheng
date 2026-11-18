@@ -29,7 +29,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/   # web
 
 ```json
 {"status":"ok","service":"mall","database":"ready","database_error":null}
-{"status":"ok","service":"agent-service","config_status":"ready","model":"deepseek-chat","mall":"http://127.0.0.1:3011","prompt":"ready"}
+{"status":"ok","service":"agent-service","config_status":"ready","model":"deepseek-chat","mall":"http://127.0.0.1:3011","demo_user_id":"u-demo","prompt":"ready"}
 ```
 
 web 返回 `200`。健康时的入口：
@@ -91,6 +91,21 @@ curl -s http://127.0.0.1:8000/health
 curl -s http://127.0.0.1:3011/api/products | head -c 200
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/chat
 ```
+
+个性化推荐相关接口（演示用户 `u-demo`）：
+
+```bash
+curl -s http://127.0.0.1:3011/api/users/u-demo/profile
+curl -s http://127.0.0.1:3011/api/users/u-demo/browsing-history
+curl -s http://127.0.0.1:3011/api/users/u-demo/orders
+curl -s http://127.0.0.1:3011/api/users/u-demo/cart
+curl -s "http://127.0.0.1:3011/api/recommendations/u-demo?limit=10" | head -c 400
+curl -s "http://127.0.0.1:3011/api/ads/candidates?user_id=u-demo&context_product_ids=jasmine-tea&limit=3" | head -c 400
+```
+
+聊天里问「帮我推荐三个适合送朋友的生日礼物，预算 300 以内」，应返回 3 个
+商品；如果包含广告商品，名称后应有「（推广）」，推荐理由会引用浏览、订单或
+购物车信号。详细设计见 [spec/personalized-recommendation.md](spec/personalized-recommendation.md)。
 
 ## 停止 / 重启
 

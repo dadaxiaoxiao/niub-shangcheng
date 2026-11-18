@@ -181,19 +181,22 @@ curl http://127.0.0.1:8000/health
 
 ```json
 {"status":"ok","service":"mall","database":"ready","database_error":null}
-{"status":"ok","service":"agent-service","config_status":"ready","model":"deepseek-chat","mall":"http://127.0.0.1:3001"}
+{"status":"ok","service":"agent-service","config_status":"ready","model":"deepseek-chat","mall":"http://127.0.0.1:3001","demo_user_id":"u-demo"}
 ```
 
 然后按顺序验证功能：
 
-1. 打开 <http://localhost:3000>，能看到 6 件商品；
+1. 打开 <http://localhost:3000>，能看到 10 件商品；
 2. 打开 <http://localhost:3000/chat>，发一条消息，回复逐字流式出现；
 3. 刷新页面，消息仍在，左侧出现历史会话；
 4. 点击历史会话，地址变为 `/chat/{id}`，内容完整；
 5. 在历史会话里继续提问，新消息追加到同一会话；
 6. 点侧栏条目的 `×` 删除会话；
 7. 问「300 元以内送朋友什么」，回复里的商品、价格和库存来自商城目录，
-   不会编造不存在的商品。
+   不会编造不存在的商品；
+8. 问「帮我推荐三个适合送朋友的生日礼物，预算 300 以内」，回复应恰好有
+   3 个商品，理由引用浏览/订单/购物车信号；若包含广告商品，名称后带
+   「（推广）」。
 
 首页内嵌的问答组件是单轮快速提问，不写入历史；完整多轮对话在 `/chat`。
 商城接口文档在 <http://localhost:3001/docs>，Agent 接口文档在
@@ -215,12 +218,15 @@ curl http://127.0.0.1:8000/health
 ## 数据存储
 
 - 商品目录：`mall/src/mall/catalog.py` 中的内存常量。
+- 用户画像、浏览/搜索记录、订单、购物车、推荐和广告：`mall/src/mall/personalization.py`
+  中的内存 mock，不落库，数据库未初始化时也可用。
 - 会话历史：MySQL，DDL 的唯一来源是 `mall/schema.sql`。
 - 会话历史的运行期读写通过 SQLAlchemy 2.0 ORM 完成：实体定义在
   `mall/src/mall/entities.py`，查询与事务在 `mall/src/mall/conversations.py`，
   驱动为 PyMySQL。ORM 不负责建表。
-- 商品推荐由 `agent-service` 通过 function calling 调用 mall 的
-  `/api/products` 完成（只读），工具调用结果不落库。
+- 个性化推荐由 `agent-service` 的 `recommend_products` 工具编排：并行读取画像/
+  行为/订单/购物车 → 推荐 mock → 广告 mock → 以目录为准校验过滤 → 模型最终
+  选 3 个；工具调用结果不落库。
 - Agent 提示词在 `agent-service/prompts/shopping_agent.md`，由
   `config/llm.yaml` 的 `llm.prompt_file` 指定，修改后热加载。
 - 初始化只由 `uv run python -m mall.init_db` 或手动执行 `schema.sql` 触发；
@@ -230,7 +236,23 @@ curl http://127.0.0.1:8000/health
 - 会话列表、消息读取与删除都经由 mall 的 `/api/conversations` 接口，
   web 的流式代理负责「读历史 → 调模型 → 写消息」。
 - 流式生成中客户端断开时，已生成的部分会以 `interrupted` 状态保存。
-- 当前没有用户体系，所有访客共享同一份历史会话。
+- 当前使用固定演示用户 `u-demo`，没有登录和用户切换；所有访客共享同一份
+  历史会话和同一份演示画像。
+
+## 个性化推荐链路
+
+`agent-service` 的 `recommend_products` 工具按固定顺序完成：
+
+1. 并行读取用户画像、浏览/搜索记录、历史订单和购物车；
+2. 调 mall 推荐 mock 取候选；
+3. 调 mall 广告 mock 取推广候选（失败可跳过）；
+4. 以商品目录为准校验库存/价格，过滤购物车、退货、avoid、已购耐用品和
+   超预算商品；
+5. 模型综合画像与候选理由，输出 3 个商品，广告商品标注「（推广）」。
+
+演示用户固定为 `u-demo`，数据在 `mall/src/mall/personalization.py`；可通过
+`config/llm.yaml` 的 `mall.demo_user_id` 修改（目前 mock 只有 `u-demo`）。
+设计与验收标准见 [spec/personalized-recommendation.md](spec/personalized-recommendation.md)。
 
 ## Python 热加载
 
