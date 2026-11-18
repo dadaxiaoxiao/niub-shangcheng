@@ -9,6 +9,7 @@ from mall import db
 from mall.catalog import catalog
 from mall.conversations_api import router as conversations_router
 from mall.models import Product
+from mall.personalization_api import router as personalization_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,7 @@ app = FastAPI(
 )
 
 app.include_router(conversations_router)
+app.include_router(personalization_router)
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -46,6 +48,9 @@ async def root() -> dict[str, str]:
         "service": "mall",
         "products": "/api/products",
         "conversations": "/api/conversations",
+        "users": "/api/users/{user_id}/profile",
+        "recommendations": "/api/recommendations/{user_id}",
+        "ads": "/api/ads/candidates",
         "docs": "/docs",
     }
 

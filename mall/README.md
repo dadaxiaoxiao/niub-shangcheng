@@ -1,7 +1,23 @@
 # Mall
 
 商城领域逻辑与 HTTP API：商品目录（内存数据）+ 会话历史（MySQL 持久化，
-SQLAlchemy ORM）。
+SQLAlchemy ORM）+ 个性化推荐/广告 mock（内存数据）。
+
+## 个性化 mock 数据
+
+`src/mall/personalization.py` 提供固定演示用户 `u-demo` 的画像、浏览/搜索
+记录、历史订单和购物车，并模拟商品推荐系统与广告系统。全部数据在内存中，
+不依赖 MySQL，数据库未初始化时也可用。
+
+演示故事（时间按当前日期相对生成）：
+
+- 用户偏好茶饮和器物，价格带 60–260 元，avoid「浓香、甜腻」，近期有朋友
+  生日；
+- 浏览过竹影茶盘、月白杯，搜索过「送朋友的生日礼物」；
+- 云岫茉莉已到复购周期，亚麻袋有退货记录；
+- 购物车里有月白杯和竹影茶盘；
+- 推荐候选会故意包含退货、avoid 和购物车商品，用来验证 agent 侧过滤；
+- 广告候选包含冬日茶礼盒、月白杯和低相关度桂花囊。
 
 ## 配置
 
@@ -69,6 +85,12 @@ uv run uvicorn mall.main:app --reload --port 3001
 - `GET /health`
 - `GET /api/products`
 - `GET /api/products/{product_id}`
+- `GET /api/users/{user_id}/profile`
+- `GET /api/users/{user_id}/browsing-history?limit=20`
+- `GET /api/users/{user_id}/orders?limit=10`
+- `GET /api/users/{user_id}/cart`
+- `GET /api/recommendations/{user_id}?limit=10&focus=&category=&max_price_cents=`
+- `GET /api/ads/candidates?user_id=u-demo&context_product_ids=&limit=3`
 - `GET /api/conversations`
 - `POST /api/conversations`
 - `GET /api/conversations/{conversation_id}`
